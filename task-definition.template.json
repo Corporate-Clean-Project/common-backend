@@ -1,0 +1,36 @@
+{
+  "family": "top-pristine-common-backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::123456789012:role/dummy-ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::123456789012:role/dummy-ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "common-backend",
+      "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/top-pristine/common-backend:latest",
+      "portMappings": [{ "containerPort": 5000, "protocol": "tcp" }],
+      "essential": true,
+      "environment": [
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "PORT", "value": "5000" }
+      ],
+      "secrets": [
+        { "name": "MONGODB_URI", "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:dummy/MONGODB_URI" },
+        { "name": "JWT_ACCESS_SECRET", "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:dummy/JWT_ACCESS_SECRET" },
+        { "name": "JWT_REFRESH_SECRET", "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:dummy/JWT_REFRESH_SECRET" },
+        { "name": "SMTP_USER", "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:dummy/SMTP_USER" },
+        { "name": "SMTP_PASSWORD", "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789012:secret:dummy/SMTP_PASSWORD" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/top-pristine-common-backend",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
