@@ -1,1 +1,0 @@
-Note: register this template once via 'aws ecs register-task-definition' before the first CI/CD deploy; the workflow then fetches and updates the live definition on each subsequent run.

@@ -1,58 +1,63 @@
 const crypto = require('crypto');
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
-const { sendMail } = require('../utils/mailer');
+const { sendInvitationEmail } = require('../utils/emailjs');
 
-// @desc  List team members
-// @route GET /api/users
+const TEMPORARY_PASSWORD_CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+function generateTemporaryPassword() {
+  return Array.from(
+    { length: 6 },
+    () => TEMPORARY_PASSWORD_CHARACTERS[crypto.randomInt(TEMPORARY_PASSWORD_CHARACTERS.length)]
+  ).join('');
+}
+
 const listUsers = asyncHandler(async (req, res) => {
   const users = await User.find().sort({ createdAt: -1 });
   res.json({ success: true, users: users.map((u) => u.toSafeObject()) });
 });
 
-// @desc  Invite a new team member (creates a pending user + emails an invite link)
-// @route POST /api/users/invite
+
 const inviteUser = asyncHandler(async (req, res) => {
-  const { email, role = 'admin', name } = req.body;
-  if (!email) {
+  const { email, role = 'admin', name } = req.body || {};
+  if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
     res.status(400);
-    throw new Error('email is required');
+    throw new Error('A valid email is required');
   }
 
-  const existing = await User.findOne({ email: email.toLowerCase() });
+  const normalizedEmail = email.trim().toLowerCase();
+  const existing = await User.findOne({ email: normalizedEmail });
   if (existing) {
     res.status(409);
     throw new Error('A user with that email already exists');
   }
 
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  const temporaryPassword = crypto.randomBytes(12).toString('hex');
+  const temporaryPassword = generateTemporaryPassword();
 
   const user = await User.create({
-    name: name || email.split('@')[0],
-    email: email.toLowerCase(),
+    name: typeof name === 'string' && name.trim() ? name.trim() : normalizedEmail.split('@')[0],
+    email: normalizedEmail,
     password: temporaryPassword,
     role,
     status: 'invited',
-    inviteToken: crypto.createHash('sha256').update(rawToken).digest('hex'),
-    inviteTokenExpires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
-  const inviteUrl = `${process.env.ADMIN_FRONTEND_URL}/accept-invite?token=${rawToken}&email=${encodeURIComponent(
-    user.email
-  )}`;
-
-  await sendMail({
-    to: user.email,
-    subject: "You've been invited to the Top Pristine Admin Workspace",
-    html: `<p>You have been invited as <strong>${role}</strong>. Click below to set your password and activate your account (valid 7 days).</p><p><a href="${inviteUrl}">${inviteUrl}</a></p>`,
-  });
+  try {
+    await sendInvitationEmail({
+      to: user.email,
+      name: user.name,
+      role: user.role,
+      temporaryPassword,
+    });
+  } catch (err) {
+    await user.deleteOne();
+    throw new Error(`Invitation email could not be sent: ${err.message}`);
+  }
 
   res.status(201).json({ success: true, user: user.toSafeObject() });
 });
 
-// @desc  Update a user's role or status
-// @route PATCH /api/users/:id
+
 const updateUser = asyncHandler(async (req, res) => {
   const { role, status, name } = req.body;
   const user = await User.findById(req.params.id);
@@ -67,8 +72,7 @@ const updateUser = asyncHandler(async (req, res) => {
   res.json({ success: true, user: user.toSafeObject() });
 });
 
-// @desc  Remove a team member
-// @route DELETE /api/users/:id
+
 const deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) {

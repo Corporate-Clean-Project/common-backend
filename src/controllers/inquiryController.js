@@ -2,104 +2,138 @@ const asyncHandler = require('express-async-handler');
 const Inquiry = require('../models/Inquiry');
 const { sendMail } = require('../utils/mailer');
 
-// Rough, purely illustrative estimate ranges for the public "instant quote" tool.
-const SIZE_MULTIPLIER = { compact: 1, medium: 2.4, large: 4.8, estate: 8 };
-const SERVICE_BASE = {
-  kitchen: [45000, 120000],
-  'primary-bath': [35000, 95000],
-  'full-estate': [250000, 900000],
-  millwork: [20000, 80000],
-  exterior: [60000, 220000],
-};
+const INQUIRY_TYPES = ['General Inquiry', 'Partnership', 'Feedback', 'Other'];
+const SERVICES = [
+  'Commercial Office Cleaning',
+  'Janitorial Services',
+  'Deep Sanitization & Disinfection',
+  'Post-Construction Cleaning',
+  'Floor Care',
+];
+const CLEANING_SCHEDULES = ['Daily', 'Weekly', 'Bi-weekly', 'Monthly', 'One-time'];
+const BUDGET_RANGES = ['Under $1,000/mo', '$1,000 - $3,000/mo', '$3,000+ / Custom'];
 
-function estimateRange(serviceType, projectSize) {
-  const base = SERVICE_BASE[serviceType] || [30000, 100000];
-  const multiplier = SIZE_MULTIPLIER[projectSize] || 1;
-  return {
-    low: Math.round((base[0] * multiplier) / 1000) * 1000,
-    high: Math.round((base[1] * multiplier) / 1000) * 1000,
-  };
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
-// @desc  Public: submit a general contact/inquiry form
-// @route POST /api/inquiries
+function isValidEmail(value) {
+  return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]);
+}
+
+
 const createInquiry = asyncHandler(async (req, res) => {
-  const { fullName, email, phone, scope, projectAddress, message } = req.body;
-  if (!fullName || !email || !message) {
+  const {
+    fullName,
+    companyName,
+    email,
+    phone,
+    inquiryType,
+    message,
+  } = req.body || {};
+  if (
+    !isNonEmptyString(fullName)
+    || !isValidEmail(email)
+    || !isNonEmptyString(phone)
+    || !INQUIRY_TYPES.includes(inquiryType)
+    || !isNonEmptyString(message)
+  ) {
     res.status(400);
-    throw new Error('fullName, email and message are required');
+    throw new Error('fullName, valid email, phone, inquiryType and message are required');
   }
 
   const inquiry = await Inquiry.create({
     type: 'general',
-    fullName,
-    email,
-    phone,
-    scope,
-    projectAddress,
-    message,
+    fullName: fullName.trim(),
+    companyName,
+    email: email.trim().toLowerCase(),
+    phone: phone.trim(),
+    inquiryType,
+    message: message.trim(),
   });
 
   await sendMail({
     to: process.env.MAIL_FROM,
-    subject: `New inquiry from ${fullName}`,
-    html: `<p>New general inquiry received from ${fullName} (${email}).</p><p>${message}</p>`,
+    subject: `New inquiry from ${fullName.trim()}`,
+    html: `<p>New ${escapeHtml(inquiryType.toLowerCase())} received from ${escapeHtml(fullName)} (${escapeHtml(email)}).</p><p>Company: ${escapeHtml(companyName || 'Not provided')}</p><p>Phone: ${escapeHtml(phone)}</p><p>${escapeHtml(message)}</p>`,
   });
 
   res.status(201).json({ success: true, inquiry });
 });
 
-// @desc  Public: submit an instant quote / project quote request
-// @route POST /api/inquiries/quote
+
 const createQuoteInquiry = asyncHandler(async (req, res) => {
   const {
-    fullName,
+    contactName,
+    companyName,
     email,
     phone,
     serviceType,
-    projectSize,
-    timeline,
-    projectAddress,
-    message,
-  } = req.body;
+    facilitySize,
+    cleaningSchedule,
+    startDate,
+    budgetRange,
+    notes,
+  } = req.body || {};
+  const parsedFacilitySize = Number(facilitySize);
+  const validStartDate = !startDate
+    || (
+      typeof startDate === 'string'
+      && /^\d{4}-\d{2}-\d{2}$/.test(startDate)
+      && !Number.isNaN(Date.parse(`${startDate}T00:00:00.000Z`))
+      && new Date(`${startDate}T00:00:00.000Z`).toISOString().slice(0, 10) === startDate
+    );
 
-  if (!fullName || !email || !serviceType || !projectSize) {
+  if (
+    !isNonEmptyString(contactName)
+    || !isValidEmail(email)
+    || !isNonEmptyString(phone)
+    || !SERVICES.includes(serviceType)
+    || !Number.isInteger(parsedFacilitySize)
+    || parsedFacilitySize < 1
+    || !CLEANING_SCHEDULES.includes(cleaningSchedule)
+    || (budgetRange && !BUDGET_RANGES.includes(budgetRange))
+    || !validStartDate
+  ) {
     res.status(400);
-    throw new Error('fullName, email, serviceType and projectSize are required');
+    throw new Error('contactName, valid email, phone, serviceType, positive facilitySize and cleaningSchedule are required; optional fields must be valid');
   }
-
-  const { low, high } = estimateRange(serviceType, projectSize);
 
   const inquiry = await Inquiry.create({
     type: 'quote',
-    fullName,
-    email,
-    phone,
-    projectAddress,
+    fullName: contactName.trim(),
+    companyName,
+    email: email.trim().toLowerCase(),
+    phone: phone.trim(),
     serviceType,
-    projectSize,
-    timeline,
-    message,
-    estimatedRangeLow: low,
-    estimatedRangeHigh: high,
-    status: 'quoted',
+    facilitySize: parsedFacilitySize,
+    cleaningSchedule,
+    startDate: startDate || undefined,
+    budgetRange: budgetRange || undefined,
+    notes,
+    message: notes,
   });
 
   await sendMail({
     to: process.env.MAIL_FROM,
-    subject: `New quote request from ${fullName}`,
-    html: `<p>New quote request from ${fullName} (${email}) - estimate $${low.toLocaleString()} - $${high.toLocaleString()}.</p>`,
+    subject: `New cleaning quote request from ${contactName.trim()}`,
+    html: `<p>New cleaning quote request from ${escapeHtml(contactName)} (${escapeHtml(email)}).</p><p>Company: ${escapeHtml(companyName || 'Not provided')}</p><p>Phone: ${escapeHtml(phone)}</p><p>Service: ${escapeHtml(serviceType)}</p><p>Facility size: ${parsedFacilitySize.toLocaleString()} sq ft</p><p>Schedule: ${escapeHtml(cleaningSchedule)}</p><p>Target start date: ${escapeHtml(startDate || 'Not provided')}</p><p>Budget: ${escapeHtml(budgetRange || 'Not provided')}</p><p>Notes: ${escapeHtml(notes || 'None')}</p>`,
   });
 
-  res.status(201).json({
-    success: true,
-    inquiry,
-    estimate: { low, high, currency: 'USD' },
-  });
+  res.status(201).json({ success: true, inquiry });
 });
 
-// @desc  Admin: list inquiries with optional filtering/search
-// @route GET /api/inquiries
+
 const listInquiries = asyncHandler(async (req, res) => {
   const { status, type, q, page = 1, limit = 20 } = req.query;
   const filter = {};
@@ -122,8 +156,7 @@ const listInquiries = asyncHandler(async (req, res) => {
   res.json({ success: true, inquiries, total, page: Number(page), limit: Number(limit) });
 });
 
-// @desc  Admin: get single inquiry
-// @route GET /api/inquiries/:id
+
 const getInquiry = asyncHandler(async (req, res) => {
   const inquiry = await Inquiry.findById(req.params.id);
   if (!inquiry) {
@@ -133,8 +166,7 @@ const getInquiry = asyncHandler(async (req, res) => {
   res.json({ success: true, inquiry });
 });
 
-// @desc  Admin: update inquiry status
-// @route PATCH /api/inquiries/:id
+
 const updateInquiry = asyncHandler(async (req, res) => {
   const { status } = req.body;
   const inquiry = await Inquiry.findById(req.params.id);
@@ -147,8 +179,7 @@ const updateInquiry = asyncHandler(async (req, res) => {
   res.json({ success: true, inquiry });
 });
 
-// @desc  Admin: reply to an inquiry by email (also stored on the record)
-// @route POST /api/inquiries/:id/reply
+
 const replyToInquiry = asyncHandler(async (req, res) => {
   const { message } = req.body;
   if (!message) {
@@ -179,8 +210,7 @@ const replyToInquiry = asyncHandler(async (req, res) => {
   res.json({ success: true, inquiry });
 });
 
-// @desc  Admin: delete an inquiry
-// @route DELETE /api/inquiries/:id
+
 const deleteInquiry = asyncHandler(async (req, res) => {
   const inquiry = await Inquiry.findById(req.params.id);
   if (!inquiry) {

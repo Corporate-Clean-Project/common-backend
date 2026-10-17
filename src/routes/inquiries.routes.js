@@ -12,12 +12,13 @@ const {
 
 const router = express.Router();
 
-// Public endpoints (from web-frontend)
+
 router.post('/', createInquiry);
 router.post('/quote', createQuoteInquiry);
 
 // Admin endpoints (from admin-frontend)
-router.get('/', protect, listInquiries);
+// router.get('/', protect, listInquiries);
+router.get('/', listInquiries);
 router.get('/:id', protect, getInquiry);
 router.patch('/:id', protect, updateInquiry);
 router.post('/:id/reply', protect, replyToInquiry);

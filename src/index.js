@@ -6,7 +6,7 @@ const PORT = process.env.PORT || 5000;
 
 async function start() {
   try {
-    // await connectDB();
+    await connectDB();
     const app = createApp();
     app.listen(PORT, () => {
       console.log(`[server] common-backend listening on port ${PORT} (${process.env.NODE_ENV || 'development'})`);

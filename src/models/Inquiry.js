@@ -16,9 +16,22 @@ const inquirySchema = new mongoose.Schema(
     fullName: { type: String, required: true, trim: true },
     email: { type: String, required: true, trim: true, lowercase: true },
     phone: { type: String, trim: true },
-    scope: { type: String, trim: true }, // e.g. residential / commercial
+    companyName: { type: String, trim: true },
+    inquiryType: {
+      type: String,
+      enum: ['General Inquiry', 'Partnership', 'Feedback', 'Other'],
+    },
+    scope: { type: String, trim: true },
     projectAddress: { type: String, trim: true },
-    serviceType: { type: String, trim: true }, // kitchen, primary-bath, full-estate, millwork, exterior
+    serviceType: { type: String, trim: true },
+    facilitySize: { type: Number, min: 1 },
+    cleaningSchedule: {
+      type: String,
+      enum: ['Daily', 'Weekly', 'Bi-weekly', 'Monthly', 'One-time'],
+    },
+    startDate: { type: Date },
+    budgetRange: { type: String, enum: ['Under $1,000/mo', '$1,000 - $3,000/mo', '$3,000+ / Custom'] },
+    notes: { type: String, trim: true },
     projectSize: { type: String, trim: true }, // compact, medium, large, estate
     timeline: { type: String, trim: true }, // rush, standard, flexible, longterm
     estimatedRangeLow: { type: Number },
