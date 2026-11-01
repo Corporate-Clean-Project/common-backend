@@ -19,6 +19,14 @@ function createApp() {
   // Vercel runs behind a proxy; needed for correct client IPs (rate limiting)
   app.set('trust proxy', 1);
 
+  // API responses differ per origin, so never cache or revalidate them
+  app.set('etag', false);
+  app.use('/api', (req, res, next) => {
+    res.vary('Origin');
+    res.set('Cache-Control', 'no-store');
+    next();
+  });
+
   const allowedOrigins = (process.env.CORS_ORIGINS || '')
     .split(',')
     .map((o) => o.trim())
