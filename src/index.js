@@ -1,20 +1,22 @@
 require('dotenv').config();
-const { createApp } = require('./app');
 const { connectDB } = require('./config/db');
+const { createApp } = require('./createApp');
 
-const PORT = process.env.PORT || 5000;
+const app = createApp();
 
-async function start() {
-  try {
-    await connectDB();
-    const app = createApp();
-    app.listen(PORT, () => {
-      console.log(`[server] common-backend listening on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
+
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  connectDB()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`[server] common-backend listening on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
+      });
+    })
+    .catch((err) => {
+      console.error('[server] Failed to start:', err.message);
+      process.exit(1);
     });
-  } catch (err) {
-    console.error('[server] Failed to start:', err.message);
-    process.exit(1);
-  }
 }
 
-start();
+module.exports = app;

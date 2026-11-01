@@ -4,6 +4,8 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
+const { connectDB } = require('./config/db');
+
 const authRoutes = require('./routes/auth.routes');
 const usersRoutes = require('./routes/users.routes');
 const inquiriesRoutes = require('./routes/inquiries.routes');
@@ -14,25 +16,36 @@ const { notFound, errorHandler } = require('./middleware/errorHandler');
 function createApp() {
   const app = express();
 
+  // Vercel runs behind a proxy; needed for correct client IPs (rate limiting)
+  app.set('trust proxy', 1);
+
   const allowedOrigins = (process.env.CORS_ORIGINS || '')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
 
-  app.use(helmet());
-  app.use(
-    cors({
-      origin(origin, callback) {
-        if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
-          return callback(null, true);
-        }
-        return callback(new Error(`Origin ${origin} not allowed by CORS`));
-      },
-      credentials: true,
-    })
-  );
+  const corsOptions = {
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      // don't throw: just omit CORS headers for unknown origins
+      return callback(null, false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    optionsSuccessStatus: 204,
+  };
+
+  // CORS first, so even error responses carry the headers
+  app.use(cors(corsOptions));
+  app.options('*', cors(corsOptions));
+
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true }));
+
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
   }
@@ -46,6 +59,16 @@ function createApp() {
   app.use('/api', apiLimiter);
 
   app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+
+  // Connect to MongoDB lazily for API requests (cached across warm invocations)
+  app.use('/api', async (req, res, next) => {
+    try {
+      await connectDB();
+      next();
+    } catch (err) {
+      next(err);
+    }
+  });
 
   app.use('/api/auth', authRoutes);
   app.use('/api/users', usersRoutes);
