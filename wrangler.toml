@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────────
+# Cloudflare Worker configuration for common-backend
+# Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+# ─────────────────────────────────────────────────────────────────
+
+name = "pristine-common-backend"
+main = "dist/worker.mjs"
+
+# Node.js compatibility mode — required for Express, Mongoose, bcryptjs, etc.
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat", "no_handle_cross_request_promise_resolution"]
+
+# Custom build step — uses esbuild with platform:'node' for correct CJS interop
+[build]
+command = "node build.cjs"
+
+# Secrets are set via `wrangler secret put <NAME>` — NOT placed here.
+# The [vars] section below holds only NON-SECRET config values.
+[vars]
+NODE_ENV = "production"
+CORS_ORIGINS = "http://localhost:5173,http://localhost:5174,https://toppristine.com,https://admin.toppristine.com"
+JWT_ACCESS_EXPIRES_IN = "15m"
+JWT_REFRESH_EXPIRES_IN = "7d"
+WEB_FRONTEND_URL = "https://www.toppristine.com,http://localhost:5173"
+ADMIN_FRONTEND_URL = "https://admin.toppristine.com,http://localhost:5174"
+MAIL_FROM = "vehiclemart2@gmail.com"
+
+# ─── Secrets (set via CLI, listed here as reminder) ───────────────
+# wrangler secret put MONGODB_URI
+# wrangler secret put JWT_ACCESS_SECRET
+# wrangler secret put JWT_REFRESH_SECRET
+# wrangler secret put EMAILJS_SERVICE_ID
+# wrangler secret put EMAILJS_INVITE_TEMPLATE_ID
+# wrangler secret put EMAILJS_PUBLIC_KEY
+# wrangler secret put EMAILJS_PRIVATE_KEY
+# wrangler secret put EMAILJS_MAIL_TEMPLATE_ID
