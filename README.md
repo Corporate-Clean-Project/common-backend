@@ -1,13 +1,13 @@
 # common-backend
 
 Node.js + Express + MongoDB (Mongoose) REST API shared by `web-frontend` (public site)
-and `admin-frontend` (CMS admin console) of the Top Pristine Luxury Craft corporate website.
+and `admin-frontend` (CMS admin console) of the Pristine Luxury Craft corporate website.
 
 ## Stack
 - Node.js 20, Express 4
 - MongoDB / Mongoose
 - JWT access + refresh token authentication
-- EmailJS for team invitation emails; Nodemailer for password resets and inquiry replies
+- EmailJS for team invitations, password resets, quote notifications, and inquiry replies
 
 ## Getting started
 
@@ -23,25 +23,30 @@ npm run dev               # http://localhost:5000
 Set the application's environment variables in your local environment or deployment
 secret manager. Never commit `.env` or real credentials.
 
-Team invites also require the EmailJS service ID, invite template ID, public key, and
-private key to be set as `EMAILJS_SERVICE_ID`, `EMAILJS_INVITE_TEMPLATE_ID`,
-`EMAILJS_PUBLIC_KEY`, and `EMAILJS_PRIVATE_KEY`. Keep the private key only in the
-backend environment; never put it in frontend code. The private key is sent to EmailJS
-as its `accessToken` server-side.
+Email sending requires EmailJS service, invite and transactional template IDs, public
+key, and private key to be set as `EMAILJS_SERVICE_ID`, `EMAILJS_INVITE_TEMPLATE_ID`,
+`EMAILJS_MAIL_TEMPLATE_ID`, `EMAILJS_PUBLIC_KEY`, and `EMAILJS_PRIVATE_KEY`. Keep the
+private key only in the backend environment; never put it in frontend code. The private
+key is sent to EmailJS as its `accessToken` server-side.
 
 ```dotenv
 EMAILJS_SERVICE_ID=your_emailjs_service_id
 EMAILJS_INVITE_TEMPLATE_ID=your_invite_template_id
+EMAILJS_MAIL_TEMPLATE_ID=your_transactional_mail_template_id
 EMAILJS_PUBLIC_KEY=your_emailjs_public_key
 EMAILJS_PRIVATE_KEY=your_emailjs_private_key
 ```
 
+Configure the transactional EmailJS template with **To Email** set to `{{to_email}}`,
+**Subject** set to `{{subject}}`, and the message body using `{{{message_html}}}` (or
+`{{message_text}}` for a plain-text template). Set the sender in the EmailJS template.
+
 In the EmailJS invite template, set **To Email** to `{{to_email}}`. Suggested subject:
 `You're invited to {{app_name}}`. Use these template variables in the message:
-`{{to_name}}`, `{{role}}`, and `{{temporary_password}}`. The invitation email contains
-a randomly generated six-character temporary password. The User model hashes it before
-it is stored in MongoDB. Do not add an invite URL: the invite-acceptance page is not
-implemented.
+`{{to_name}}`, `{{role}}`, and `{{temporary_password}}`. The invitation form requires
+an initial password of at least eight characters and emails it to the invited work
+address. The User model hashes it before it is stored in MongoDB. Do not add an invite
+URL: the invite-acceptance page is not implemented.
 
 Example HTML content:
 
@@ -57,7 +62,7 @@ Example HTML content:
 | Area       | Routes                                                   | Auth        |
 |------------|-----------------------------------------------------------|-------------|
 | Auth       | `POST /api/auth/login`, `/refresh`, `/forgot-password`, `/reset-password`, `/accept-invite`, `GET /me` | Mixed |
-| Users      | `GET /api/users`, `POST /api/users/invite`, `PATCH/DELETE /api/users/:id` | Admin |
+| Users      | `GET /api/users`, `POST /api/users/invite`, `PATCH/DELETE /api/users/:id` (admin); `PATCH /api/users/:id/reset-password` (super admin) | Admin |
 | Inquiries  | `POST /api/inquiries`, `POST /api/inquiries/quote` (public); `GET/PATCH/DELETE /api/inquiries/:id`, `POST /api/inquiries/:id/reply` (admin) | Mixed |
 | Content    | `GET /api/content/:page` (public); `GET /api/content`, `PUT /api/content/:page` (admin) | Mixed |
 | Dashboard  | `GET /api/dashboard/stats` | Admin |

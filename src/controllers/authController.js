@@ -4,8 +4,7 @@ const User = require('../models/User');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
 const { sendMail } = require('../utils/mailer');
 
-// @desc  Admin login
-// @route POST /api/auth/login
+
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -19,6 +18,7 @@ const login = asyncHandler(async (req, res) => {
     throw new Error('Invalid email or password');
   }
 
+  user.status = 'active';
   user.lastLoginAt = new Date();
   await user.save();
 
@@ -33,8 +33,7 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc  Exchange a refresh token for a new access token
-// @route POST /api/auth/refresh
+
 const refresh = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
   if (!refreshToken) {
@@ -57,14 +56,12 @@ const refresh = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc  Get the currently authenticated admin user
-// @route GET /api/auth/me
+
 const me = asyncHandler(async (req, res) => {
   res.json({ success: true, user: req.user.toSafeObject() });
 });
 
-// @desc  Kick off a password reset (always responds success to avoid email enumeration)
-// @route POST /api/auth/forgot-password
+
 const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
   const user = await User.findOne({ email: (email || '').toLowerCase() });
@@ -81,7 +78,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
     await sendMail({
       to: user.email,
-      subject: 'Reset your Top Pristine admin password',
+      subject: 'Reset your Pristine admin password',
       html: `<p>Hello ${user.name},</p><p>Click the link below to reset your admin workstation password. This link expires in 1 hour.</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
     });
   }
@@ -92,8 +89,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc  Complete a password reset using the emailed token
-// @route POST /api/auth/reset-password
+
 const resetPassword = asyncHandler(async (req, res) => {
   const { email, token, password } = req.body;
   if (!email || !token || !password) {
@@ -121,8 +117,7 @@ const resetPassword = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Password updated successfully. Please sign in.' });
 });
 
-// @desc  Accept a team invite and set an initial password
-// @route POST /api/auth/accept-invite
+
 const acceptInvite = asyncHandler(async (req, res) => {
   const { email, token, name, password } = req.body;
   if (!email || !token || !password) {

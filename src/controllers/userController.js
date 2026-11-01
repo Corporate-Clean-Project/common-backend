@@ -1,16 +1,6 @@
-const crypto = require('crypto');
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const { sendInvitationEmail } = require('../utils/emailjs');
-
-const TEMPORARY_PASSWORD_CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-
-function generateTemporaryPassword() {
-  return Array.from(
-    { length: 6 },
-    () => TEMPORARY_PASSWORD_CHARACTERS[crypto.randomInt(TEMPORARY_PASSWORD_CHARACTERS.length)]
-  ).join('');
-}
 
 const listUsers = asyncHandler(async (req, res) => {
   const users = await User.find().sort({ createdAt: -1 });
@@ -19,7 +9,19 @@ const listUsers = asyncHandler(async (req, res) => {
 
 
 const inviteUser = asyncHandler(async (req, res) => {
-  const { email, role = 'admin', name } = req.body || {};
+  const { email, role = 'admin', name, password } = req.body || {};
+  if (!['super_admin', 'admin', 'editor'].includes(role)) {
+    res.status(400);
+    throw new Error('A valid user role is required');
+  }
+  if (typeof password !== 'string' || password.length < 8) {
+    res.status(400);
+    throw new Error('A password of at least 8 characters is required');
+  }
+  if (req.user.role === 'admin' && role === 'super_admin') {
+    res.status(403);
+    throw new Error('Master Admin cannot invite a Super Admin');
+  }
   if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
     res.status(400);
     throw new Error('A valid email is required');
@@ -32,12 +34,10 @@ const inviteUser = asyncHandler(async (req, res) => {
     throw new Error('A user with that email already exists');
   }
 
-  const temporaryPassword = generateTemporaryPassword();
-
   const user = await User.create({
     name: typeof name === 'string' && name.trim() ? name.trim() : normalizedEmail.split('@')[0],
     email: normalizedEmail,
-    password: temporaryPassword,
+    password,
     role,
     status: 'invited',
   });
@@ -47,7 +47,7 @@ const inviteUser = asyncHandler(async (req, res) => {
       to: user.email,
       name: user.name,
       role: user.role,
-      temporaryPassword,
+      temporaryPassword: password,
     });
   } catch (err) {
     await user.deleteOne();
@@ -87,4 +87,25 @@ const deleteUser = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'User removed' });
 });
 
-module.exports = { listUsers, inviteUser, updateUser, deleteUser };
+const resetUserPassword = asyncHandler(async (req, res) => {
+  const { password } = req.body || {};
+  if (typeof password !== 'string' || password.length < 8) {
+    res.status(400);
+    throw new Error('The new password must be at least 8 characters');
+  }
+
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  user.password = password;
+  user.passwordResetToken = undefined;
+  user.passwordResetExpires = undefined;
+  await user.save();
+
+  res.json({ success: true, message: 'Password reset successfully' });
+});
+
+module.exports = { listUsers, inviteUser, updateUser, deleteUser, resetUserPassword };

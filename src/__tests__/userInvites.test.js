@@ -41,10 +41,10 @@ describe('POST /api/users/invite', () => {
     sendInvitationEmail.mockResolvedValue(undefined);
   });
 
-  it('emails a generated six-character password to the invited work email', async () => {
+  it('uses the supplied password and emails it to the invited work email', async () => {
     const response = await request(app)
       .post('/api/users/invite')
-      .send({ email: 'Jordan@Example.com', name: 'Jordan Lee', role: 'editor' });
+      .send({ email: 'Jordan@Example.com', name: 'Jordan Lee', role: 'editor', password: 'secure-password-123' });
 
     expect(response.statusCode).toBe(201);
     expect(User.create).toHaveBeenCalledWith(expect.objectContaining({
@@ -52,17 +52,16 @@ describe('POST /api/users/invite', () => {
       name: 'Jordan Lee',
       role: 'editor',
       status: 'invited',
+      password: 'secure-password-123',
     }));
 
-    const createArgs = User.create.mock.calls[0][0];
-    expect(createArgs.password).toMatch(/^[A-Za-z0-9]{6}$/);
-    expect(createArgs).not.toHaveProperty('inviteToken');
-    expect(createArgs).not.toHaveProperty('inviteTokenExpires');
+    expect(User.create.mock.calls[0][0]).not.toHaveProperty('inviteToken');
+    expect(User.create.mock.calls[0][0]).not.toHaveProperty('inviteTokenExpires');
     expect(sendInvitationEmail).toHaveBeenCalledWith({
       to: 'jordan@example.com',
       name: 'Jordan Lee',
       role: 'editor',
-      temporaryPassword: createArgs.password,
+      temporaryPassword: 'secure-password-123',
     });
     expect(sendInvitationEmail.mock.calls[0][0]).not.toHaveProperty('inviteUrl');
     expect(response.body.user).not.toHaveProperty('password');
@@ -73,7 +72,7 @@ describe('POST /api/users/invite', () => {
 
     const response = await request(app)
       .post('/api/users/invite')
-      .send({ email: 'jordan@example.com' });
+      .send({ email: 'jordan@example.com', password: 'secure-password-123' });
 
     expect(response.statusCode).toBe(500);
     expect(response.body.message).toContain('Invitation email could not be sent');
@@ -83,7 +82,17 @@ describe('POST /api/users/invite', () => {
   it('rejects invalid email addresses', async () => {
     const response = await request(app)
       .post('/api/users/invite')
-      .send({ email: 'not-an-email' });
+      .send({ email: 'not-an-email', password: 'secure-password-123' });
+
+    expect(response.statusCode).toBe(400);
+    expect(User.create).not.toHaveBeenCalled();
+    expect(sendInvitationEmail).not.toHaveBeenCalled();
+  });
+
+  it('rejects passwords shorter than eight characters', async () => {
+    const response = await request(app)
+      .post('/api/users/invite')
+      .send({ email: 'jordan@example.com', password: 'short' });
 
     expect(response.statusCode).toBe(400);
     expect(User.create).not.toHaveBeenCalled();

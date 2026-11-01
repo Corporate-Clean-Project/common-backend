@@ -62,12 +62,6 @@ const createInquiry = asyncHandler(async (req, res) => {
     message: message.trim(),
   });
 
-  await sendMail({
-    to: process.env.MAIL_FROM,
-    subject: `New inquiry from ${fullName.trim()}`,
-    html: `<p>New ${escapeHtml(inquiryType.toLowerCase())} received from ${escapeHtml(fullName)} (${escapeHtml(email)}).</p><p>Company: ${escapeHtml(companyName || 'Not provided')}</p><p>Phone: ${escapeHtml(phone)}</p><p>${escapeHtml(message)}</p>`,
-  });
-
   res.status(201).json({ success: true, inquiry });
 });
 
@@ -139,11 +133,12 @@ const listInquiries = asyncHandler(async (req, res) => {
   const filter = {};
   if (status) filter.status = status;
   if (type) filter.type = type;
-  if (q) {
+  if (typeof q === 'string' && q.trim()) {
+    const escapedQuery = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     filter.$or = [
-      { fullName: new RegExp(q, 'i') },
-      { email: new RegExp(q, 'i') },
-      { projectAddress: new RegExp(q, 'i') },
+      { fullName: new RegExp(escapedQuery, 'i') },
+      { email: new RegExp(escapedQuery, 'i') },
+      { projectAddress: new RegExp(escapedQuery, 'i') },
     ];
   }
 
@@ -203,8 +198,8 @@ const replyToInquiry = asyncHandler(async (req, res) => {
 
   await sendMail({
     to: inquiry.email,
-    subject: `Re: Your inquiry with Top Pristine Luxury Craft`,
-    html: `<p>${message.replace(/\n/g, '<br/>')}</p><p>— ${req.user.name}, Top Pristine Luxury Craft</p>`,
+    subject: `Re: Your inquiry with Pristine Luxury Craft`,
+    html: `<p>${escapeHtml(message).replace(/\r?\n/g, '<br/>')}</p><p>— ${escapeHtml(req.user.name)}, Pristine Luxury Craft</p>`,
   });
 
   res.json({ success: true, inquiry });

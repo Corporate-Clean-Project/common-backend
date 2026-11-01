@@ -30,12 +30,25 @@ async function seed() {
   }
 
   const aboutUsDefault = {
-    heading: 'About Top Pristine Luxury Craft',
-    intro:
-      'Top Pristine delivers high-quality architectural solutions with uncompromising attention to detail. We take pride in every creation, big or small.',
-    yearsExperience: 15,
-    certifications: ['Fully Licensed & Insured', 'Master Guild Craft Certified'],
-    materialTags: ['Bookmatched Marble', 'Custom Brass Joinery', 'Smart Ambient Lighting'],
+    founderName: 'Pristine',
+    founderTitle: 'Commercial Cleaning & Facility Care',
+    biography:
+      'Pristine delivers high-quality commercial cleaning and facility care with uncompromising attention to detail. We take pride in every service, big or small.',
+    statOne: '24/7 Rapid Response',
+    statTwo: '100% Client Focus',
+    statThree: 'A+ Service',
+    credentials: ['Fully Licensed & Insured', 'Professional Cleaning Team'],
+    tags: ['Commercial Cleaning', 'Facility Care', 'Sanitization'],
+    milestones: [],
+    workshopHeading: 'Our Approach to Facility Care',
+    workshopNarrative:
+      'We create reliable cleaning plans around each facility, its people, and its schedule.',
+    gallery: [
+      { src: '', title: '', category: 'Private Residence' },
+      { src: '', title: '', category: 'Private Residence' },
+      { src: '', title: '', category: 'Private Residence' },
+      { src: '', title: '', category: 'Private Residence' },
+    ],
   };
 
   await Content.findOneAndUpdate(

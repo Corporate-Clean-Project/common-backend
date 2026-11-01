@@ -29,11 +29,18 @@ describe('Public inquiry endpoints', () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.body.success).toBe(true);
+    expect(sendMail).not.toHaveBeenCalled();
     expect(Inquiry.create).toHaveBeenCalledWith({
       type: 'general',
       ...payload,
       email: 'jordan@example.com',
     });
+  });
+
+  it('requires authentication to list client inquiries', async () => {
+    const response = await request(app).get('/api/inquiries');
+
+    expect(response.statusCode).toBe(401);
   });
 
   it('accepts the cleaning quote form fields without making up an instant estimate', async () => {

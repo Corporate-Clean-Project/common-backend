@@ -1,7 +1,7 @@
 {
   "name": "common-backend",
   "version": "1.0.0",
-  "description": "Common Node.js/Express backend API for Top Pristine corporate CMS website (public site + admin CMS).",
+  "description": "Common Node.js/Express backend API for Pristine corporate CMS website (public site + admin CMS).",
   "main": "src/index.js",
   "type": "commonjs",
   "engines": {
@@ -24,9 +24,8 @@
     "express-validator": "^7.2.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.6.0",
-    "morgan": "^1.10.0",
-    "nodemailer": "^6.9.14"
+    "mongoose": "^8.24.6",
+    "morgan": "^1.10.0"
   },
   "devDependencies": {
     "eslint": "^8.57.0",
